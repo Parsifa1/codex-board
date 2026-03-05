@@ -1,0 +1,86 @@
+@import "tailwindcss";
+@config "../tailwind.config.ts";
+
+@layer base {
+  :root {
+    --color-canvas: 240 238 230;
+    --color-surface: 245 244 241;
+    --color-border: 232 230 225;
+    --color-muted: 200 196 188;
+    --color-ink: 26 26 26;
+    --color-subtle: 107 101 96;
+  }
+
+  :root.dark,
+  :root[data-theme='dark'],
+  html.dark,
+  body.dark {
+    --color-canvas: 18 17 16;
+    --color-surface: 26 25 24;
+    --color-border: 42 41 40;
+    --color-muted: 94 90 85;
+    --color-ink: 242 240 236;
+    --color-subtle: 177 170 161;
+  }
+
+  body {
+    @apply bg-canvas text-ink font-sans antialiased;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-muted rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-subtle;
+  }
+}
+
+@layer utilities {
+  .font-mono-key {
+    font-family: 'SF Mono', 'Fira Code', 'Fira Mono', 'Roboto Mono', monospace;
+  }
+
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .checkbox-ui {
+    @apply appearance-none w-4 h-4 rounded border border-border bg-canvas cursor-pointer relative transition-colors;
+  }
+
+  .checkbox-ui:checked {
+    @apply bg-coral border-coral;
+  }
+
+  .checkbox-ui:checked::after {
+    content: '';
+    position: absolute;
+    left: 4px;
+    top: 1px;
+    width: 4px;
+    height: 8px;
+    border: solid #fff;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+  }
+
+  .checkbox-ui:focus-visible {
+    outline: 2px solid rgba(201, 100, 66, 0.45);
+    outline-offset: 1px;
+  }
+}
