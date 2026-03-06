@@ -17,6 +17,7 @@ export interface ApiClient {
   put<T>(path: string, body: unknown): Promise<T>
   patch<T>(path: string, body: unknown): Promise<T>
   delete<T>(path: string, params?: Record<string, string>): Promise<T>
+  upload<T>(path: string, formData: FormData): Promise<T>
 }
 
 function buildBaseUrl(endpoint: string, useProxy: boolean): string {
@@ -64,6 +65,31 @@ async function request<T>(
   }
 }
 
+async function requestFormData<T>(
+  baseUrl: string,
+  managementKey: string,
+  path: string,
+  formData: FormData
+): Promise<T> {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+  try {
+    const res = await fetch(`${baseUrl}${path}`, {
+      method: 'POST',
+      signal: controller.signal,
+      headers: { Authorization: `Bearer ${managementKey}` },
+      body: formData,
+    })
+    const text = await res.text()
+    if (!res.ok) {
+      throw new ApiError(res.status, text, `HTTP ${res.status}: ${text}`)
+    }
+    return text ? (JSON.parse(text) as T) : ({} as T)
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 export function createClient(
   endpoint: string,
   managementKey: string,
@@ -82,5 +108,7 @@ export function createClient(
       request<T>(baseUrl, managementKey, path, 'PATCH', body),
     delete: <T>(path: string, params?: Record<string, string>) =>
       request<T>(baseUrl, managementKey, path, 'DELETE', undefined, params),
+    upload: <T>(path: string, formData: FormData) =>
+      requestFormData<T>(baseUrl, managementKey, path, formData),
   }
 }

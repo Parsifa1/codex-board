@@ -1,6 +1,17 @@
 import type { ApiClient } from './api'
 import type { AuthFile, AuthFilesResponse, CodexQuota, CopilotQuota, TestResult, UsageResponse } from '@/types/api'
 
+export async function uploadAuthFile(
+  client: ApiClient,
+  file: File
+): Promise<void> {
+  const formData = new FormData()
+  formData.append('file', file, file.name)
+  await client.upload<{ status?: string }>('/auth-files', formData)
+}
+
+
+
 export async function fetchAuthFiles(client: ApiClient): Promise<AuthFile[]> {
   const res = await client.get<AuthFilesResponse>('/auth-files')
   return res.files ?? []
