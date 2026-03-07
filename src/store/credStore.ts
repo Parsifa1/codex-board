@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { createClient, type ApiClient } from '@/lib/api'
 import { loadTestResults, saveTestResults } from '@/lib/storage'
-import type { AuthFile, ConnectionConfig, TestResult } from '@/types/api'
+import type { AuthFile, ConnectionConfig, TestResult, TestStatus } from '@/types/api'
 
 interface CredStore {
   connection: ConnectionConfig | null
@@ -22,7 +22,7 @@ interface CredStore {
   updateFile: (name: string, updated: Partial<AuthFile>) => void
   removeFile: (name: string) => void
   setTestResult: (name: string, result: TestResult) => void
-  setTestStatus: (name: string, status: 'testing') => void
+  setTestStatus: (name: string, status: TestStatus) => void
   toggleSelect: (name: string) => void
   selectAll: (names: string[]) => void
   clearSelection: () => void

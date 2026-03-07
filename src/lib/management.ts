@@ -1,5 +1,6 @@
 import type { ApiClient } from './api'
 import type { AuthFile, AuthFilesResponse, CodexQuota, CopilotQuota, TestResult, UsageResponse } from '@/types/api'
+import { useCredStore } from '@/store/credStore'
 
 export async function uploadAuthFile(
   client: ApiClient,
@@ -49,6 +50,8 @@ interface ApiCallResponse {
 
 const CODEX_USAGE_CHALLENGE_MAX_RETRIES = 3
 const CODEX_USAGE_CHALLENGE_BASE_DELAY_MS = 1200
+const CODEX_USAGE_TRANSIENT_MAX_RETRIES = 3
+const CODEX_USAGE_TRANSIENT_BASE_DELAY_MS = 1200
 
 function getHeaderValues(headers: Record<string, string[]>, name: string): string[] {
   const target = name.toLowerCase()
@@ -91,9 +94,25 @@ function getCodexChallengeDelayMs(retryIndex: number): number {
   return CODEX_USAGE_CHALLENGE_BASE_DELAY_MS * (retryIndex + 1)
 }
 
+function getCodexTransientDelayMs(retryIndex: number): number {
+  return CODEX_USAGE_TRANSIENT_BASE_DELAY_MS * (retryIndex + 1)
+}
+
 function getChallengeBlockedMessage(retryCount: number): string {
   if (retryCount <= 0) return 'Cloudflare challenge blocked usage endpoint'
   return `Cloudflare challenge blocked usage endpoint after ${retryCount} retries`
+}
+
+function isRetryableCodexUsageError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false
+  if (err.name === 'AbortError') return true
+
+  const message = err.message.toLowerCase()
+  return message.includes('networkerror')
+    || message.includes('failed to fetch')
+    || message.includes('operation was aborted')
+    || message.includes('network request failed')
+    || message.includes('load failed')
 }
 
 async function requestCodexUsage(client: ApiClient, authFile: AuthFile): Promise<ApiCallResponse> {
@@ -114,17 +133,37 @@ async function requestCodexUsage(client: ApiClient, authFile: AuthFile): Promise
 async function requestCodexUsageWithChallengeRetry(
   client: ApiClient,
   authFile: AuthFile
-): Promise<{ response: ApiCallResponse; challengeRetries: number }> {
-  let response = await requestCodexUsage(client, authFile)
+): Promise<{ response: ApiCallResponse; challengeRetries: number; transientRetries: number }> {
+  const { setTestStatus } = useCredStore.getState()
   let challengeRetries = 0
+  let transientRetries = 0
 
-  while (isCloudflareChallenge(response) && challengeRetries < CODEX_USAGE_CHALLENGE_MAX_RETRIES) {
-    await sleep(getCodexChallengeDelayMs(challengeRetries))
-    challengeRetries += 1
-    response = await requestCodexUsage(client, authFile)
+  while (true) {
+    try {
+      const response = await requestCodexUsage(client, authFile)
+
+      if (isCloudflareChallenge(response) && challengeRetries < CODEX_USAGE_CHALLENGE_MAX_RETRIES) {
+        setTestStatus(authFile.name, 'retrying')
+        await sleep(getCodexChallengeDelayMs(challengeRetries))
+        challengeRetries += 1
+        continue
+      }
+
+      return { response, challengeRetries, transientRetries }
+    } catch (err) {
+      if (!isRetryableCodexUsageError(err) || transientRetries >= CODEX_USAGE_TRANSIENT_MAX_RETRIES) {
+        if (transientRetries > 0) {
+          const message = err instanceof Error ? err.message : String(err)
+          throw new Error(`usage request failed after ${transientRetries} retries: ${message}`)
+        }
+        throw err
+      }
+
+      setTestStatus(authFile.name, 'retrying')
+      await sleep(getCodexTransientDelayMs(transientRetries))
+      transientRetries += 1
+    }
   }
-
-  return { response, challengeRetries }
 }
 
 export async function testAuthFile(

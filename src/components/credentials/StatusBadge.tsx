@@ -12,7 +12,9 @@ const STATUS_CONFIG: Record<string, StatusConfig> = {
   valid:      { label: '有效',    bg: '#FEF0EB', text: '#C96442' },
   active:     { label: '活跃',    bg: '#FEF0EB', text: '#C96442' },
   disabled:   { label: '已禁用',  bg: '#F2F1EF', text: '#9A948C' },
+  queued:     { label: '队列中',  bg: '#FDF5E6', text: '#C4933A' },
   testing:    { label: '测试中',  bg: '#FDF5E6', text: '#C4933A' },
+  retrying:   { label: '重试中',  bg: '#FDF5E6', text: '#C4933A' },
   refreshing: { label: '刷新中',  bg: '#FDF5E6', text: '#C4933A' },
   pending:    { label: '等待中',  bg: '#FDF5E6', text: '#C4933A' },
   error:      { label: '错误',    bg: '#FCEAEA', text: '#B94040' },
@@ -27,7 +29,7 @@ interface StatusBadgeProps {
 
 export default function StatusBadge({ status }: StatusBadgeProps) {
   const config = STATUS_CONFIG[status] ?? STATUS_CONFIG.unknown
-  const spinning = status === 'testing' || status === 'refreshing' || status === 'pending'
+  const spinning = status === 'queued' || status === 'testing' || status === 'retrying' || status === 'refreshing' || status === 'pending'
 
   return (
     <span

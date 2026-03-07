@@ -38,7 +38,9 @@ export interface AuthFilesResponse {
 
 export type TestStatus =
   | 'unknown'
+  | 'queued'
   | 'testing'
+  | 'retrying'
   | 'valid'
   | 'quota'
   | 'expired'
