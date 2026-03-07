@@ -522,7 +522,7 @@ export default function CredentialTabs() {
 
           <button
             onClick={() => setUploadOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-2xs font-medium text-subtle rounded hover:bg-black/5 hover:text-ink transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-2xs font-medium text-subtle dark:text-ink/85 rounded hover:bg-black/5 hover:text-ink transition-colors"
             title="上传凭证文件"
           >
             <UploadIcon />
@@ -532,7 +532,7 @@ export default function CredentialTabs() {
           <button
             onClick={refresh}
             disabled={refreshing}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-2xs font-medium text-subtle rounded hover:bg-black/5 hover:text-ink disabled:opacity-50 transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-2xs font-medium text-subtle dark:text-ink/85 rounded hover:bg-black/5 hover:text-ink disabled:opacity-50 transition-colors"
           >
             <RefreshIcon spinning={refreshing} />
             刷新
@@ -550,7 +550,7 @@ export default function CredentialTabs() {
               <button
                 onClick={() => setBulkMenuOpen((v) => !v)}
                 disabled={bulkDisabling || (expiredFiles.length === 0 && quotaFiles.length === 0 && allErrorFiles.length === 0 && allExpiredFiles.length === 0 && reenableQuotaRecoveredFiles.length === 0)}
-                className="flex items-center gap-1 px-3 py-1.5 text-2xs font-medium text-subtle rounded hover:bg-black/5 hover:text-ink disabled:opacity-50 transition-colors"
+                className="flex items-center gap-1 px-3 py-1.5 text-2xs font-medium text-subtle dark:text-ink/85 rounded hover:bg-black/5 hover:text-ink disabled:opacity-50 transition-colors"
                 title="一键处理"
               >
               {bulkDisabling ? <SpinIcon /> : <BanIcon />}
@@ -622,59 +622,55 @@ export default function CredentialTabs() {
         </div>
       )}
 
-      <div className="px-4 py-2 border-b border-border bg-canvas flex items-center gap-2">
-        <QuickFilterButton
-          active={quickFilter === 'all'}
-          onClick={() => setQuickFilter('all')}
-          label="全部"
-        />
-        {allExpiredFiles.length > 0 && (
+      <div className="px-4 py-2 border-b border-border bg-canvas">
+        <div className="flex items-center gap-2 min-w-0 overflow-x-auto no-scrollbar">
           <QuickFilterButton
-            active={quickFilter === 'expired'}
-            onClick={() => setQuickFilter('expired')}
-            label={`已过期 (${allExpiredFiles.length})`}
+            active={quickFilter === 'all'}
+            onClick={() => setQuickFilter('all')}
+            label="全部"
           />
-        )}
-        {allQuotaFiles.length > 0 && (
-          <QuickFilterButton
-            active={quickFilter === 'quota'}
-            onClick={() => setQuickFilter('quota')}
-            label={`已超额 (${allQuotaFiles.length})`}
-          />
-        )}
-        {allHasQuotaFiles.length > 0 && (
-          <QuickFilterButton
-            active={quickFilter === 'has-quota'}
-            onClick={() => setQuickFilter('has-quota')}
-            label={`有配额 (${allHasQuotaFiles.length})`}
-          />
-        )}
-        {allOtherFiles.length > 0 && (
-          <QuickFilterButton
-            active={quickFilter === 'other'}
-            onClick={() => setQuickFilter('other')}
-            label={`其他 (${allOtherFiles.length})`}
-          />
-        )}
-        {canDisableQuotaFiles.length > 0 && (
-          <QuickFilterButton
-            active={quickFilter === 'can-disable'}
-            onClick={() => setQuickFilter('can-disable')}
-            label={`可禁用 (${canDisableQuotaFiles.length})`}
-          />
-        )}
-        {reenableQuotaRecoveredFiles.length > 0 && (
-          <QuickFilterButton
-            active={quickFilter === 'can-enable'}
-            onClick={() => setQuickFilter('can-enable')}
-            label={`可启用 (${reenableQuotaRecoveredFiles.length})`}
-          />
-        )}
-
-        <div className="ml-auto flex items-center gap-2">
-          <span className="text-2xs text-subtle tabular-nums whitespace-nowrap">
-            统计：过期 {allExpiredFiles.length} · 超额 {allQuotaFiles.length} · 有配额 {allHasQuotaFiles.length} · 其他 {allOtherFiles.length} · 可禁用 {canDisableQuotaFiles.length} · 可启用 {reenableQuotaRecoveredFiles.length} · 错误 {allErrorFiles.length}
-          </span>
+          {allExpiredFiles.length > 0 && (
+            <QuickFilterButton
+              active={quickFilter === 'expired'}
+              onClick={() => setQuickFilter('expired')}
+              label={`已过期 (${allExpiredFiles.length})`}
+            />
+          )}
+          {allQuotaFiles.length > 0 && (
+            <QuickFilterButton
+              active={quickFilter === 'quota'}
+              onClick={() => setQuickFilter('quota')}
+              label={`已超额 (${allQuotaFiles.length})`}
+            />
+          )}
+          {allHasQuotaFiles.length > 0 && (
+            <QuickFilterButton
+              active={quickFilter === 'has-quota'}
+              onClick={() => setQuickFilter('has-quota')}
+              label={`有配额 (${allHasQuotaFiles.length})`}
+            />
+          )}
+          {allOtherFiles.length > 0 && (
+            <QuickFilterButton
+              active={quickFilter === 'other'}
+              onClick={() => setQuickFilter('other')}
+              label={`其他 (${allOtherFiles.length})`}
+            />
+          )}
+          {canDisableQuotaFiles.length > 0 && (
+            <QuickFilterButton
+              active={quickFilter === 'can-disable'}
+              onClick={() => setQuickFilter('can-disable')}
+              label={`可禁用 (${canDisableQuotaFiles.length})`}
+            />
+          )}
+          {reenableQuotaRecoveredFiles.length > 0 && (
+            <QuickFilterButton
+              active={quickFilter === 'can-enable'}
+              onClick={() => setQuickFilter('can-enable')}
+              label={`可启用 (${reenableQuotaRecoveredFiles.length})`}
+            />
+          )}
 
           {allErrorFiles.length > 0 && (
             <QuickFilterButton
@@ -710,14 +706,14 @@ function QuickFilterButton({
   return (
     <button
       onClick={onClick}
-      className={`px-2.5 py-1 rounded text-2xs border transition-colors ${
+      className={`h-7 px-2.5 rounded text-2xs font-medium tracking-[0.01em] border whitespace-nowrap flex-shrink-0 transition-colors ${
         isDanger
           ? active
-            ? 'border-[#D55353] text-[#B94040] bg-[#FCEAEA]'
-            : 'border-[#EBC4C4] text-[#B94040] bg-[#FFF7F7] hover:border-[#D55353] hover:bg-[#FCEAEA]'
+            ? 'border-[#D55353] text-[#B94040] bg-[#FCEAEA] dark:border-[#A34B4B] dark:text-[#FFD6D6] dark:bg-[#4A2424]'
+            : 'border-[#EBC4C4] text-[#B94040] bg-[#FFF7F7] hover:border-[#D55353] hover:bg-[#FCEAEA] dark:border-[#6E3A3A] dark:text-[#F3C2C2] dark:bg-[#2A1A1A] dark:hover:border-[#A34B4B] dark:hover:bg-[#402121]'
           : active
-            ? 'border-coral text-coral bg-coral/10'
-            : 'border-border text-subtle hover:text-ink hover:border-ink'
+            ? 'border-coral text-coral bg-coral/12 shadow-[inset_0_0_0_1px_rgba(201,100,66,0.08)]'
+            : 'border-border bg-canvas text-ink/90 hover:text-ink hover:border-ink'
       }`}
     >
       {label}

@@ -15,9 +15,9 @@ const DARK_VARS: Record<string, string> = {
   '--color-canvas': '18 17 16',
   '--color-surface': '26 25 24',
   '--color-border': '42 41 40',
-  '--color-muted': '94 90 85',
+  '--color-muted': '118 112 104',
   '--color-ink': '242 240 236',
-  '--color-subtle': '177 170 161',
+  '--color-subtle': '196 188 178',
 }
 
 function resolveSystemTheme(): ThemeMode {
