@@ -8,7 +8,7 @@ import { deleteAuthFile, patchAuthFileStatus } from '@/lib/management'
 import CredentialTable, { type SortMode } from './CredentialTable'
 import UploadModal from './UploadModal'
 import type { AuthFile } from '@/types/api'
-type QuickFilter = 'all' | 'expired' | 'quota' | 'has-quota' | 'other' | 'can-disable' | 'can-enable'
+type QuickFilter = 'all' | 'expired' | 'quota' | 'has-quota' | 'other' | 'error' | 'can-disable' | 'can-enable'
 const SORT_MODE_KEY = 'cliproxy_sort_mode'
 
 const VALID_SORT_MODES: SortMode[] = [
@@ -183,8 +183,9 @@ export default function CredentialTabs() {
       if (quickFilter === 'expired') return isExpiredStatus(status)
       if (quickFilter === 'quota') return status === 'quota'
       if (quickFilter === 'has-quota') return hasAvailableQuota(f)
+      if (quickFilter === 'error') return status === 'error'
       if (quickFilter === 'other') {
-        return !isExpiredStatus(status) && status !== 'quota' && !hasAvailableQuota(f)
+        return !isExpiredStatus(status) && status !== 'quota' && status !== 'error' && !hasAvailableQuota(f)
       }
       if (quickFilter === 'can-disable') return !f.disabled && status === 'quota'
       if (quickFilter === 'can-enable') return f.disabled && hasAvailableQuota(f)
@@ -298,6 +299,15 @@ export default function CredentialTabs() {
       if (isHiddenTestingStatus(f)) return false
       const s = getEffectiveStatus(f, testResults[f.name])
       return s === 'quota'
+    }),
+    [filesInProviderScope, testResults]
+  )
+
+  const allErrorFiles = useMemo(
+    () => filesInProviderScope.filter((f) => {
+      if (isHiddenTestingStatus(f)) return false
+      const s = getEffectiveStatus(f, testResults[f.name])
+      return s === 'error'
     }),
     [filesInProviderScope, testResults]
   )
@@ -510,7 +520,7 @@ export default function CredentialTabs() {
           <div className="relative" ref={menuRef}>
               <button
                 onClick={() => setBulkMenuOpen((v) => !v)}
-                disabled={bulkDisabling || (expiredFiles.length === 0 && quotaFiles.length === 0 && allOtherFiles.length === 0 && allExpiredFiles.length === 0 && reenableQuotaRecoveredFiles.length === 0)}
+                disabled={bulkDisabling || (expiredFiles.length === 0 && quotaFiles.length === 0 && allErrorFiles.length === 0 && allExpiredFiles.length === 0 && reenableQuotaRecoveredFiles.length === 0)}
                 className="flex items-center gap-1 px-3 py-1.5 text-2xs font-medium text-subtle rounded hover:bg-black/5 hover:text-ink disabled:opacity-50 transition-colors"
                 title="一键处理"
               >
@@ -540,12 +550,12 @@ export default function CredentialTabs() {
                 </button>
                 <div className="border-t border-border" />
                 <button
-                  onClick={() => void handleBulkRetest(allOtherFiles)}
-                  disabled={allOtherFiles.length === 0 || isRunning}
+                  onClick={() => void handleBulkRetest(allErrorFiles)}
+                  disabled={allErrorFiles.length === 0 || isRunning}
                   className="w-full text-left px-3 py-2 text-2xs hover:bg-surface disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 >
-                  <span className="text-ink font-medium">重试其他</span>
-                  <span className="ml-1.5 text-subtle">({allOtherFiles.length})</span>
+                  <span className="text-ink font-medium">重试错误</span>
+                  <span className="ml-1.5 text-subtle">({allErrorFiles.length})</span>
                 </button>
                 <div className="border-t border-border" />
                 <button
@@ -619,10 +629,18 @@ export default function CredentialTabs() {
           onClick={() => setQuickFilter('can-enable')}
           label={`可启用 (${reenableQuotaRecoveredFiles.length})`}
         />
-
         <span className="ml-auto text-2xs text-subtle tabular-nums">
-          统计：过期 {allExpiredFiles.length} · 超额 {allQuotaFiles.length} · 有配额 {allHasQuotaFiles.length} · 其他 {allOtherFiles.length} · 可禁用 {canDisableQuotaFiles.length} · 可启用 {reenableQuotaRecoveredFiles.length}
+          统计：过期 {allExpiredFiles.length} · 超额 {allQuotaFiles.length} · 有配额 {allHasQuotaFiles.length} · 其他 {allOtherFiles.length} · 可禁用 {canDisableQuotaFiles.length} · 可启用 {reenableQuotaRecoveredFiles.length} · 错误 {allErrorFiles.length}
         </span>
+
+        {allErrorFiles.length > 0 && (
+          <QuickFilterButton
+            active={quickFilter === 'error'}
+            onClick={() => setQuickFilter('error')}
+            label={`错误 (${allErrorFiles.length})`}
+            tone="danger"
+          />
+        )}
       </div>
 
       <CredentialTable files={displayFiles} loading={loading} sortMode={sortMode} onSortChange={setSortMode} />
