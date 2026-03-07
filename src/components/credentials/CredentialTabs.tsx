@@ -365,6 +365,35 @@ export default function CredentialTabs() {
     [filesInProviderScope, testResults]
   )
 
+  useEffect(() => {
+    if (isRunning) return
+    if (quickFilter === 'all') return
+
+    const hasEntriesByFilter: Record<Exclude<QuickFilter, 'all'>, boolean> = {
+      expired: allExpiredFiles.length > 0,
+      quota: allQuotaFiles.length > 0,
+      'has-quota': allHasQuotaFiles.length > 0,
+      other: allOtherFiles.length > 0,
+      error: allErrorFiles.length > 0,
+      'can-disable': canDisableQuotaFiles.length > 0,
+      'can-enable': reenableQuotaRecoveredFiles.length > 0,
+    }
+
+    if (!hasEntriesByFilter[quickFilter]) {
+      setQuickFilter('all')
+    }
+  }, [
+    isRunning,
+    quickFilter,
+    allExpiredFiles.length,
+    allQuotaFiles.length,
+    allHasQuotaFiles.length,
+    allOtherFiles.length,
+    allErrorFiles.length,
+    canDisableQuotaFiles.length,
+    reenableQuotaRecoveredFiles.length,
+  ])
+
   async function handleBulkDisable(targets: AuthFile[], label: string) {
     if (!client || targets.length === 0) return
     setBulkDisabling(true)
@@ -599,48 +628,63 @@ export default function CredentialTabs() {
           onClick={() => setQuickFilter('all')}
           label="全部"
         />
-        <QuickFilterButton
-          active={quickFilter === 'expired'}
-          onClick={() => setQuickFilter('expired')}
-          label={`已过期 (${allExpiredFiles.length})`}
-        />
-        <QuickFilterButton
-          active={quickFilter === 'quota'}
-          onClick={() => setQuickFilter('quota')}
-          label={`已超额 (${allQuotaFiles.length})`}
-        />
-        <QuickFilterButton
-          active={quickFilter === 'has-quota'}
-          onClick={() => setQuickFilter('has-quota')}
-          label={`有配额 (${allHasQuotaFiles.length})`}
-        />
-        <QuickFilterButton
-          active={quickFilter === 'other'}
-          onClick={() => setQuickFilter('other')}
-          label={`其他 (${allOtherFiles.length})`}
-        />
-        <QuickFilterButton
-          active={quickFilter === 'can-disable'}
-          onClick={() => setQuickFilter('can-disable')}
-          label={`可禁用 (${canDisableQuotaFiles.length})`}
-        />
-        <QuickFilterButton
-          active={quickFilter === 'can-enable'}
-          onClick={() => setQuickFilter('can-enable')}
-          label={`可启用 (${reenableQuotaRecoveredFiles.length})`}
-        />
-        <span className="ml-auto text-2xs text-subtle tabular-nums">
-          统计：过期 {allExpiredFiles.length} · 超额 {allQuotaFiles.length} · 有配额 {allHasQuotaFiles.length} · 其他 {allOtherFiles.length} · 可禁用 {canDisableQuotaFiles.length} · 可启用 {reenableQuotaRecoveredFiles.length} · 错误 {allErrorFiles.length}
-        </span>
-
-        {allErrorFiles.length > 0 && (
+        {allExpiredFiles.length > 0 && (
           <QuickFilterButton
-            active={quickFilter === 'error'}
-            onClick={() => setQuickFilter('error')}
-            label={`错误 (${allErrorFiles.length})`}
-            tone="danger"
+            active={quickFilter === 'expired'}
+            onClick={() => setQuickFilter('expired')}
+            label={`已过期 (${allExpiredFiles.length})`}
           />
         )}
+        {allQuotaFiles.length > 0 && (
+          <QuickFilterButton
+            active={quickFilter === 'quota'}
+            onClick={() => setQuickFilter('quota')}
+            label={`已超额 (${allQuotaFiles.length})`}
+          />
+        )}
+        {allHasQuotaFiles.length > 0 && (
+          <QuickFilterButton
+            active={quickFilter === 'has-quota'}
+            onClick={() => setQuickFilter('has-quota')}
+            label={`有配额 (${allHasQuotaFiles.length})`}
+          />
+        )}
+        {allOtherFiles.length > 0 && (
+          <QuickFilterButton
+            active={quickFilter === 'other'}
+            onClick={() => setQuickFilter('other')}
+            label={`其他 (${allOtherFiles.length})`}
+          />
+        )}
+        {canDisableQuotaFiles.length > 0 && (
+          <QuickFilterButton
+            active={quickFilter === 'can-disable'}
+            onClick={() => setQuickFilter('can-disable')}
+            label={`可禁用 (${canDisableQuotaFiles.length})`}
+          />
+        )}
+        {reenableQuotaRecoveredFiles.length > 0 && (
+          <QuickFilterButton
+            active={quickFilter === 'can-enable'}
+            onClick={() => setQuickFilter('can-enable')}
+            label={`可启用 (${reenableQuotaRecoveredFiles.length})`}
+          />
+        )}
+
+        <div className="ml-auto flex items-center gap-2">
+          <span className="text-2xs text-subtle tabular-nums whitespace-nowrap">
+            统计：过期 {allExpiredFiles.length} · 超额 {allQuotaFiles.length} · 有配额 {allHasQuotaFiles.length} · 其他 {allOtherFiles.length} · 可禁用 {canDisableQuotaFiles.length} · 可启用 {reenableQuotaRecoveredFiles.length} · 错误 {allErrorFiles.length}
+          </span>
+
+          {allErrorFiles.length > 0 && (
+            <QuickFilterButton
+              active={quickFilter === 'error'}
+              onClick={() => setQuickFilter('error')}
+              label={`错误 (${allErrorFiles.length})`}
+              tone="danger"
+            />
+          )}
+        </div>
       </div>
 
       <CredentialTable files={displayFiles} loading={loading} sortMode={sortMode} onSortChange={setSortMode} />
