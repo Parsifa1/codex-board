@@ -87,7 +87,7 @@ export default function CredentialTable({ files, loading, sortMode, onSortChange
     } else if (sortMode === pair[0]) {
       onSortChange(pair[1])
     } else {
-      onSortChange(pair[0])
+      onSortChange('default')
     }
   }
 

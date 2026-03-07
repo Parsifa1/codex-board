@@ -8,7 +8,7 @@ import { deleteAuthFile, patchAuthFileStatus } from '@/lib/management'
 import CredentialTable, { type SortMode } from './CredentialTable'
 import UploadModal from './UploadModal'
 import type { AuthFile } from '@/types/api'
-type QuickFilter = 'all' | 'expired' | 'quota' | 'disabled' | 'error' | 'has-quota' | 'other' | 're-enable'
+type QuickFilter = 'all' | 'expired' | 'quota' | 'has-quota' | 'other' | 'can-disable' | 'can-enable'
 const SORT_MODE_KEY = 'cliproxy_sort_mode'
 
 const VALID_SORT_MODES: SortMode[] = [
@@ -122,6 +122,45 @@ export default function CredentialTabs() {
     return status === 'valid'
   }
 
+  function getQuotaResetTimestamp(file: AuthFile): number | null {
+    const result = testResults[file.name]
+
+    const codexWindow = result?.quota?.rate_limit.primary_window
+    if (codexWindow) {
+      if (typeof codexWindow.reset_at === 'number' && Number.isFinite(codexWindow.reset_at) && codexWindow.reset_at > 0) {
+        return codexWindow.reset_at > 1_000_000_000_000
+          ? codexWindow.reset_at
+          : codexWindow.reset_at * 1000
+      }
+      if (
+        typeof codexWindow.reset_after_seconds === 'number'
+        && Number.isFinite(codexWindow.reset_after_seconds)
+        && codexWindow.reset_after_seconds >= 0
+        && Number.isFinite(result?.testedAt)
+      ) {
+        return result.testedAt + codexWindow.reset_after_seconds * 1000
+      }
+    }
+
+    const copilotReset = result?.copilotQuota?.quota_reset_date
+    if (copilotReset) {
+      const parsed = new Date(copilotReset).getTime()
+      if (Number.isFinite(parsed)) return parsed
+    }
+
+    if (file.next_retry_after) {
+      const parsed = new Date(file.next_retry_after).getTime()
+      if (Number.isFinite(parsed)) return parsed
+    }
+
+    return null
+  }
+
+  function isHiddenTestingStatus(file: AuthFile): boolean {
+    const status = getEffectiveStatus(file, testResults[file.name])
+    return status === 'queued' || status === 'testing' || status === 'retrying'
+  }
+
   const filesInProviderScope = useMemo(() => {
     const byProvider = activeProvider === '全部'
       ? files
@@ -138,15 +177,17 @@ export default function CredentialTabs() {
 
   const filteredFiles = useMemo(() => {
     return filesInProviderScope.filter((f) => {
-      if (quickFilter === 'all') return true
       const status = getEffectiveStatus(f, testResults[f.name])
+      if (status === 'queued' || status === 'testing' || status === 'retrying') return false
+      if (quickFilter === 'all') return true
       if (quickFilter === 'expired') return isExpiredStatus(status)
       if (quickFilter === 'quota') return status === 'quota'
-      if (quickFilter === 'disabled') return f.disabled && status !== 'quota'
-      if (quickFilter === 'error') return status === 'error'
-      if (quickFilter === 'has-quota') return !f.disabled && hasAvailableQuota(f)
-      if (quickFilter === 'other') return !isExpiredStatus(status) && status !== 'quota' && !(!f.disabled && hasAvailableQuota(f))
-      if (quickFilter === 're-enable') return f.disabled && hasAvailableQuota(f)
+      if (quickFilter === 'has-quota') return hasAvailableQuota(f)
+      if (quickFilter === 'other') {
+        return !isExpiredStatus(status) && status !== 'quota' && !hasAvailableQuota(f)
+      }
+      if (quickFilter === 'can-disable') return !f.disabled && status === 'quota'
+      if (quickFilter === 'can-enable') return f.disabled && hasAvailableQuota(f)
       return true
     })
   }, [filesInProviderScope, quickFilter, testResults])
@@ -203,16 +244,18 @@ export default function CredentialTabs() {
 
     if (sortMode === 'reset-asc') {
       return list.sort((a, b) => {
-        const aTime = a.next_retry_after ? new Date(a.next_retry_after).getTime() : Infinity
-        const bTime = b.next_retry_after ? new Date(b.next_retry_after).getTime() : Infinity
-        return aTime - bTime
+        const aTime = getQuotaResetTimestamp(a) ?? Infinity
+        const bTime = getQuotaResetTimestamp(b) ?? Infinity
+        if (aTime !== bTime) return aTime - bTime
+        return a.name.localeCompare(b.name)
       })
     }
     if (sortMode === 'reset-desc') {
       return list.sort((a, b) => {
-        const aTime = a.next_retry_after ? new Date(a.next_retry_after).getTime() : -Infinity
-        const bTime = b.next_retry_after ? new Date(b.next_retry_after).getTime() : -Infinity
-        return bTime - aTime
+        const aTime = getQuotaResetTimestamp(a) ?? -Infinity
+        const bTime = getQuotaResetTimestamp(b) ?? -Infinity
+        if (aTime !== bTime) return bTime - aTime
+        return a.name.localeCompare(b.name)
       })
     }
 
@@ -252,39 +295,12 @@ export default function CredentialTabs() {
 
   const allQuotaFiles = useMemo(
     () => filesInProviderScope.filter((f) => {
+      if (isHiddenTestingStatus(f)) return false
       const s = getEffectiveStatus(f, testResults[f.name])
       return s === 'quota'
     }),
     [filesInProviderScope, testResults]
   )
-
-  const allErrorFiles = useMemo(
-    () => filesInProviderScope.filter((f) => {
-      const s = getEffectiveStatus(f, testResults[f.name])
-      return s === 'error'
-    }),
-    [filesInProviderScope, testResults]
-  )
-
-  const allDisabledFiles = useMemo(
-    () => filesInProviderScope.filter((f) => {
-      const s = getEffectiveStatus(f, testResults[f.name])
-      return f.disabled && s !== 'quota'
-    }),
-    [filesInProviderScope, testResults]
-  )
-
-  useEffect(() => {
-    if (quickFilter === 'error' && allErrorFiles.length === 0) {
-      setQuickFilter('all')
-    }
-  }, [quickFilter, allErrorFiles.length])
-
-  useEffect(() => {
-    if (quickFilter === 'disabled' && allDisabledFiles.length === 0) {
-      setQuickFilter('all')
-    }
-  }, [quickFilter, allDisabledFiles.length])
 
   async function handleBulkRetest(targets: AuthFile[]) {
     if (targets.length === 0 || isRunning) return
@@ -294,13 +310,24 @@ export default function CredentialTabs() {
 
   const reenableQuotaRecoveredFiles = useMemo(
     () => filesInProviderScope.filter((f) => {
+      if (isHiddenTestingStatus(f)) return false
       return f.disabled && hasAvailableQuota(f)
+    }),
+    [filesInProviderScope, testResults]
+  )
+
+  const canDisableQuotaFiles = useMemo(
+    () => filesInProviderScope.filter((f) => {
+      if (isHiddenTestingStatus(f)) return false
+      const s = getEffectiveStatus(f, testResults[f.name])
+      return !f.disabled && s === 'quota'
     }),
     [filesInProviderScope, testResults]
   )
 
   const allHasQuotaFiles = useMemo(
     () => filesInProviderScope.filter((f) => {
+      if (isHiddenTestingStatus(f)) return false
       return !f.disabled && hasAvailableQuota(f)
     }),
     [filesInProviderScope, testResults]
@@ -308,11 +335,13 @@ export default function CredentialTabs() {
 
   const allOtherFiles = useMemo(
     () => filesInProviderScope.filter((f) => {
+      if (isHiddenTestingStatus(f)) return false
       const s = getEffectiveStatus(f, testResults[f.name])
       const isExpired = isExpiredStatus(s)
       const isQuota = s === 'quota'
+      const isError = s === 'error'
       const isHasQuota = !f.disabled && hasAvailableQuota(f)
-      return !isExpired && !isQuota && !isHasQuota
+      return !isExpired && !isQuota && !isError && !isHasQuota
     }),
     [filesInProviderScope, testResults]
   )
@@ -323,8 +352,21 @@ export default function CredentialTabs() {
     }
   }, [quickFilter, allOtherFiles.length])
 
+  useEffect(() => {
+    if (quickFilter === 'can-enable' && reenableQuotaRecoveredFiles.length === 0) {
+      setQuickFilter('all')
+    }
+  }, [quickFilter, reenableQuotaRecoveredFiles.length])
+
+  useEffect(() => {
+    if (quickFilter === 'can-disable' && canDisableQuotaFiles.length === 0) {
+      setQuickFilter('all')
+    }
+  }, [quickFilter, canDisableQuotaFiles.length])
+
   const allExpiredFiles = useMemo(
     () => filesInProviderScope.filter((f) => {
+      if (isHiddenTestingStatus(f)) return false
       const s = getEffectiveStatus(f, testResults[f.name])
       return isExpiredStatus(s)
     }),
@@ -484,12 +526,12 @@ export default function CredentialTabs() {
           </button>
 
           <div className="relative" ref={menuRef}>
-            <button
-              onClick={() => setBulkMenuOpen((v) => !v)}
-              disabled={bulkDisabling || (expiredFiles.length === 0 && quotaFiles.length === 0 && allErrorFiles.length === 0 && allExpiredFiles.length === 0 && reenableQuotaRecoveredFiles.length === 0)}
-              className="flex items-center gap-1 px-3 py-1.5 text-2xs font-medium text-subtle rounded hover:bg-black/5 hover:text-ink disabled:opacity-50 transition-colors"
-              title="一键处理"
-            >
+              <button
+                onClick={() => setBulkMenuOpen((v) => !v)}
+                disabled={bulkDisabling || (expiredFiles.length === 0 && quotaFiles.length === 0 && allOtherFiles.length === 0 && allExpiredFiles.length === 0 && reenableQuotaRecoveredFiles.length === 0)}
+                className="flex items-center gap-1 px-3 py-1.5 text-2xs font-medium text-subtle rounded hover:bg-black/5 hover:text-ink disabled:opacity-50 transition-colors"
+                title="一键处理"
+              >
               {bulkDisabling ? <SpinIcon /> : <BanIcon />}
               一键处理
               <ChevronIcon />
@@ -516,12 +558,12 @@ export default function CredentialTabs() {
                 </button>
                 <div className="border-t border-border" />
                 <button
-                  onClick={() => void handleBulkRetest(allErrorFiles)}
-                  disabled={allErrorFiles.length === 0 || isRunning}
+                  onClick={() => void handleBulkRetest(allOtherFiles)}
+                  disabled={allOtherFiles.length === 0 || isRunning}
                   className="w-full text-left px-3 py-2 text-2xs hover:bg-surface disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 >
-                  <span className="text-ink font-medium">重试错误</span>
-                  <span className="ml-1.5 text-subtle">({allErrorFiles.length})</span>
+                  <span className="text-ink font-medium">重试其他</span>
+                  <span className="ml-1.5 text-subtle">({allOtherFiles.length})</span>
                 </button>
                 <div className="border-t border-border" />
                 <button
@@ -534,11 +576,11 @@ export default function CredentialTabs() {
                 </button>
                 <div className="border-t border-border" />
                 <button
-                  onClick={() => handleBulkEnable(reenableQuotaRecoveredFiles, '启用已恢复额度')}
+                  onClick={() => handleBulkEnable(reenableQuotaRecoveredFiles, '启用有配额')}
                   disabled={reenableQuotaRecoveredFiles.length === 0}
                   className="w-full text-left px-3 py-2 text-2xs hover:bg-surface disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 >
-                  <span className="text-ink font-medium">启用恢复额度</span>
+                  <span className="text-ink font-medium">启用有配额</span>
                   <span className="ml-1.5 text-subtle">({reenableQuotaRecoveredFiles.length})</span>
                 </button>
               </div>
@@ -575,13 +617,6 @@ export default function CredentialTabs() {
           onClick={() => setQuickFilter('quota')}
           label={`已超额 (${allQuotaFiles.length})`}
         />
-        {allDisabledFiles.length > 0 && (
-          <QuickFilterButton
-            active={quickFilter === 'disabled'}
-            onClick={() => setQuickFilter('disabled')}
-            label={`已禁用 (${allDisabledFiles.length})`}
-          />
-        )}
         <QuickFilterButton
           active={quickFilter === 'has-quota'}
           onClick={() => setQuickFilter('has-quota')}
@@ -595,22 +630,18 @@ export default function CredentialTabs() {
           />
         )}
         <QuickFilterButton
-          active={quickFilter === 're-enable'}
-          onClick={() => setQuickFilter('re-enable')}
+          active={quickFilter === 'can-disable'}
+          onClick={() => setQuickFilter('can-disable')}
+          label={`可禁用 (${canDisableQuotaFiles.length})`}
+        />
+        <QuickFilterButton
+          active={quickFilter === 'can-enable'}
+          onClick={() => setQuickFilter('can-enable')}
           label={`可启用 (${reenableQuotaRecoveredFiles.length})`}
         />
 
-        {allErrorFiles.length > 0 && (
-          <QuickFilterButton
-            active={quickFilter === 'error'}
-            onClick={() => setQuickFilter('error')}
-            label={`错误 (${allErrorFiles.length})`}
-            tone="danger"
-          />
-        )}
-
         <span className="ml-auto text-2xs text-subtle tabular-nums">
-          统计：过期 {allExpiredFiles.length} · 超额 {allQuotaFiles.length} · 有配额 {allHasQuotaFiles.length} · 其他 {allOtherFiles.length} · 已禁用 {allDisabledFiles.length} · 错误 {allErrorFiles.length} · 可启用 {reenableQuotaRecoveredFiles.length}
+          统计：过期 {allExpiredFiles.length} · 超额 {allQuotaFiles.length} · 有配额 {allHasQuotaFiles.length} · 其他 {allOtherFiles.length} · 可禁用 {canDisableQuotaFiles.length} · 可启用 {reenableQuotaRecoveredFiles.length}
         </span>
       </div>
 
